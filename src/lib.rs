@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::mem::transmute;
 
-pub fn build_binary_tables(classes: &[bool; 256]) -> Option<([u8; 16], [u8; 16])> {
+pub fn build_binary_lut(classes: &[bool; 256]) -> Option<([u8; 16], [u8; 16])> {
     let classes: &[[bool; 16]; 16] = unsafe { transmute(classes) };
 
     let mut tbl_map = HashMap::new();
@@ -15,16 +15,16 @@ pub fn build_binary_tables(classes: &[bool; 256]) -> Option<([u8; 16], [u8; 16])
         return None;
     }
 
-    let mut upper_tbl = [0; 16];
-    let mut lower_tbl = [0; 16];
+    let mut lut_hi = [0; 16];
+    let mut lut_lo = [0; 16];
     for i in 0..16 {
         let shift = tbl_map[&classes[i]];
-        upper_tbl[i] = 1 << shift;
+        lut_hi[i] = 1 << shift;
         for j in 0..16 {
-            lower_tbl[j] |= (classes[i][j] as u8) << shift;
+            lut_lo[j] |= (classes[i][j] as u8) << shift;
         }
     }
-    Some((upper_tbl, lower_tbl))
+    Some((lut_hi, lut_lo))
 }
 
 #[cfg(test)]
@@ -34,16 +34,15 @@ mod tests {
     #[test]
     fn test_binary() {
         let mut classes = Box::new([false; 256]);
-        classes[b' ' as usize] = true;
-        classes[b'\r' as usize] = true;
-        classes[b'\n' as usize] = true;
-        classes[b'\t' as usize] = true;
+        for i in [b' ', b'\r', b'\n', b'\t'] {
+            classes[i as usize] = true;
+        }
 
-        let (upper_tbl, lower_tbl) = build_binary_tables(&classes).unwrap();
+        let (lut_hi, lut_lo) = build_binary_lut(&classes).unwrap();
 
         for i in 0..16 {
             for j in 0..16 {
-                assert_eq!(classes[i << 4 | j], (upper_tbl[i] & lower_tbl[j]) > 0);
+                assert_eq!(classes[i << 4 | j], (lut_hi[i] & lut_lo[j]) > 0);
             }
         }
     }
