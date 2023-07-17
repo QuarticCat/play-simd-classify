@@ -18,11 +18,11 @@ fn whitespace(c: &mut Criterion) {
         b.iter(|| {
             let mut cursor = 0;
             for chunk in data.chunks_exact(16) {
-                let chunk = u8x16::from_slice(chunk);
-                let mask = chunk.simd_eq(u8x16::splat(b' '))
-                    | chunk.simd_eq(u8x16::splat(b'\r'))
-                    | chunk.simd_eq(u8x16::splat(b'\n'))
-                    | chunk.simd_eq(u8x16::splat(b'\t'));
+                let vchunk = u8x16::from_slice(chunk);
+                let mask = vchunk.simd_eq(u8x16::splat(b' '))
+                    | vchunk.simd_eq(u8x16::splat(b'\r'))
+                    | vchunk.simd_eq(u8x16::splat(b'\n'))
+                    | vchunk.simd_eq(u8x16::splat(b'\t'));
                 if mask == mask8x16::splat(true) {
                     cursor += 16;
                 } else {
@@ -44,14 +44,25 @@ fn whitespace(c: &mut Criterion) {
     c.bench_function("simd_lookup", |b| {
         b.iter(|| {
             let mut cursor = 0;
-            for chunk in data.chunks_exact(16) {
-                let chunk = u8x16::from_slice(chunk);
-                let nib_hi = chunk >> u8x16::splat(4);
-                let nib_lo = chunk & u8x16::splat(0xf);
-                let cls_hi = unsafe { u8x16::from(_mm_shuffle_epi8(lut_hi, nib_hi.into())) };
-                let cls_lo = unsafe { u8x16::from(_mm_shuffle_epi8(lut_lo, nib_lo.into())) };
-                let classes = cls_hi & cls_lo;
-                if classes > u8x16::splat(0) {
+            for chunk in data.chunks_exact(32) {
+                let vchunk0 = u8x16::from_slice(&chunk[..16]);
+                let vchunk1 = u8x16::from_slice(&chunk[16..]);
+                let nib_hi0 = vchunk0 >> u8x16::splat(4);
+                let nib_hi1 = vchunk1 >> u8x16::splat(4);
+                let nib_lo0 = vchunk0 & u8x16::splat(0xf);
+                let nib_lo1 = vchunk1 & u8x16::splat(0xf);
+                let cls_hi0 = unsafe { u8x16::from(_mm_shuffle_epi8(lut_hi, nib_hi0.into())) };
+                let cls_hi1 = unsafe { u8x16::from(_mm_shuffle_epi8(lut_hi, nib_hi1.into())) };
+                let cls_lo0 = unsafe { u8x16::from(_mm_shuffle_epi8(lut_lo, nib_lo0.into())) };
+                let cls_lo1 = unsafe { u8x16::from(_mm_shuffle_epi8(lut_lo, nib_lo1.into())) };
+                let classes0 = cls_hi0 & cls_lo0;
+                let classes1 = cls_hi1 & cls_lo1;
+                if classes0 > u8x16::splat(0) {
+                    cursor += 16;
+                } else {
+                    todo!();
+                }
+                if classes1 > u8x16::splat(0) {
                     cursor += 16;
                 } else {
                     todo!();
